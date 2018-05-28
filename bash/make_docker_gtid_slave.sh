@@ -14,6 +14,28 @@ make_docker_gtid_slave() {
         exit 1
     fi
 
+    local ruser
+    # shellcheck disable=SC2016
+    ruser=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_USER')
+    if [ -z "${ruser}" ]; then
+        ruser="${MYSQL_REPLICATION_USER}"
+        if [ -z "${ruser}" ]; then
+            echo "Please set environment variable MYSQL_REPLICATION_USER."
+            exit 1
+        fi
+    fi
+
+    local rpass
+    # shellcheck disable=SC2016
+    rpass=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_PASSWORD')
+    if [ -z "${rpass}" ]; then
+        rpass="${MYSQL_REPLICATION_PASSWORD}"
+        if [ -z "${rpass}" ]; then
+            echo "Please set environment variable MYSQL_REPLICATION_PASSWORD."
+            exit 1
+        fi
+    fi
+
     echo "Making [${slave}] a slave of [${master}]"
 
     local mpass
@@ -58,7 +80,7 @@ make_docker_gtid_slave() {
     fi
 
     # Setup replication.
-    mysql -h "${myip}" -P "${sport}" -u root -p"${mpass}" -e "change master to master_host='${myip}', master_port=${mport}, master_user='root', master_password='${mpass}', master_auto_position=1; start slave;"
+    mysql -h "${myip}" -P "${sport}" -u root -p"${mpass}" -e "change master to master_host='${myip}', master_port=${mport}, master_user='${ruser}', master_password='${rpass}', master_auto_position=1; start slave;"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error setting up replication on [${slave}]"
