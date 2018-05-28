@@ -1,11 +1,11 @@
 #! /bin/bash
 
-make_gtid_slave() {
+make_docker_gtid_slave() {
     local master=${1}
     local slave=${2}
 
     if [ -z ${master} ] || [ -z ${slave} ]; then
-        echo "Usage: make_gtid_slave master_container_name slave_container_name"
+        echo "Usage: make_docker_gtid_slave master_container_name slave_container_name"
         exit 1
     fi
     echo "Making [${slave}] a slave of [${master}]"
@@ -62,5 +62,5 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-make_gtid_slave ${1} ${2}
+make_docker_gtid_slave ${1} ${2}
 
