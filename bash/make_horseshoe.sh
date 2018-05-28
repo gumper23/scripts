@@ -2,48 +2,49 @@
 
 myip=$(hostname -I | awk '{print $1}')
 for port in 13306 23306 33306 43306; do
-    rdir="/data/docker"
+    rootdir="/data/docker"
     inum="${port:0:1}"
     cname="mysql${inum}"
 
     # Make the directories.
-    sudo mkdir -p "${rdir}"/"${cname}"/conf.d "${rdir}"/"${cname}"/data "${rdir}"/"${cname}"/run
-    sudo chown -R vboxadd:vboxsf ${rdir}/${cname}
+    sudo mkdir -p "${rootdir}"/"${cname}"/conf.d "${rootdir}"/"${cname}"/data "${rootdir}"/"${cname}"/run
+    sudo chown -R vboxadd:vboxsf ${rootdir}/${cname}
 
     # Create the config file.
-    sudo bash -c 'cat << EOF > "${rdir}"/"${cname}"/conf.d/my.cnf
+    sudo bash -c "cat << EOF > ${rootdir}/${cname}/conf.d/my.cnf
 [mysqld]
-server-id = "${inum}"
-port = "${port}"
+server-id = ${inum}
+port = ${port}
 binlog_format = ROW
 log_bin
 log_slave_updates
 gtid_mode = ON
 enforce_gtid_consistency = true
 log_timestamps = system
-EOF'
+EOF"
 
     # Make slaves read-only.
     if [ "${inum}" -ne 1 ]; then
-        sudo bash -c 'echo "read_only = 1" >> "${rdir}"/"${cname}"/conf.d/my.cnf'
+        sudo bash -c "echo \"read_only = 1\" >> ${rootdir}/${cname}/conf.d/my.cnf"
     fi
 
     # Start the container.
-    docker run --name "${cname}" -p "${port}":"${port}" -v "${rdir}"/"${cname}"/conf:/etc/mysql/conf.d -v "${rdir}"/"${cname}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rdir}"/"${cname}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica MYSQL_REPLICATION_PASSWORD=replica -d mysql:8
+    docker run --name "${cname}" -p "${port}":"${port}" -v "${rootdir}"/"${cname}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${cname}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${cname}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
 
-    # Give the container up to 1 minute to start.
-    # The init process starts and stops mysql a couple of times. 
-    signal=SIGINT 60 docker logs -f "${cname}" | sed '$!d' | grep -qei "ready for connections"
+    for i in {1..60}; do
+        echo "Attempt [${i}]"
+        mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" --connect-timeout=1 -e "select 1" 1> /dev/null 2>&1;
+        # shellcheck disable=SC2181
+        if [ $? -eq 0 ]; then
+            break
+        fi;
+        sleep 1;
+    done
+
+    mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" --connect-timeout=1 -e "select 1" 1> /dev/null 2>&1;
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
-        (>&2 echo "Failed to start ${cname}")
-        exit 1
-    fi
-    sleep 2
-    signal=SIGINT 60 docker logs -f "${cname}" | sed '$!d' | grep -qei "ready for connections"
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-        (>&2 echo "Failed to start ${cname}")
+        echo "Failed to create ${cname}."
         exit 1
     fi
 
@@ -59,9 +60,9 @@ EOF'
         # Instance 1 is the master of instances 2 and 3.
         # Instance 2 is the master of instance 4.
         minum=1
-        if [ "${inum}" -eq 4 ]; then
-            minum=2
-        fi
+        #if [ "${inum}" -eq 4 ]; then
+        #    minum=2
+        #fi
         cmaster="mysql${minum}"
 
         ./make_docker_gtid_slave.sh "${cmaster}" "${cname}"
