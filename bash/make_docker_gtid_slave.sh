@@ -14,67 +14,69 @@ make_docker_gtid_slave() {
         exit 1
     fi
 
-    local ruser
+    local replica_user
     # shellcheck disable=SC2016
-    ruser=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_USER')
-    if [ -z "${ruser}" ]; then
-        ruser="${MYSQL_REPLICATION_USER}"
-        if [ -z "${ruser}" ]; then
+    replica_user=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_USER')
+    if [ -z "${replica_user}" ]; then
+        replica_user="${MYSQL_REPLICATION_USER}"
+        if [ -z "${replica_user}" ]; then
             echo "Please set environment variable MYSQL_REPLICATION_USER."
             exit 1
         fi
     fi
+    echo "Replication user is [${replica_user}]"
 
-    local rpass
+    local replica_password
     # shellcheck disable=SC2016
-    rpass=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_PASSWORD')
-    if [ -z "${rpass}" ]; then
-        rpass="${MYSQL_REPLICATION_PASSWORD}"
-        if [ -z "${rpass}" ]; then
+    replica_password=$(docker exec "${master}" bash -c 'echo $MYSQL_REPLICATION_PASSWORD')
+    if [ -z "${replica_password}" ]; then
+        replica_password="${MYSQL_REPLICATION_PASSWORD}"
+        if [ -z "${replica_password}" ]; then
             echo "Please set environment variable MYSQL_REPLICATION_PASSWORD."
             exit 1
         fi
     fi
+    echo "Replication password is [${replica_password}]"
 
     echo "Making [${slave}] a slave of [${master}]"
 
-    local mpass
+    local master_password
     # shellcheck disable=SC2016
-    mpass=$(docker exec "${master}" bash -c 'echo $MYSQL_ROOT_PASSWORD')
-    if [ -z "${mpass}" ]; then
+    master_password=$(docker exec "${master}" bash -c 'echo $MYSQL_ROOT_PASSWORD')
+    if [ -z "${master_password}" ]; then
         echo "$0: Unable to get password from ${master}. Is the container running?"
         exit 1
     fi
-    echo "master password = [${mpass}]"
+    echo "master password = [${master_password}]"
 
-    local spass
+    local slave_password
     # shellcheck disable=SC2016
-    spass=$(docker exec "${slave}" bash -c 'echo $MYSQL_ROOT_PASSWORD')
-    if [ -z "${spass}" ]; then
+    slave_password=$(docker exec "${slave}" bash -c 'echo $MYSQL_ROOT_PASSWORD')
+    if [ -z "${slave_password}" ]; then
         echo "$0: Unable to get password from ${slave}. Is the container running?"
         exit 1
     fi
-    echo "slave password = [${spass}]"
+    echo "slave password = [${slave_password}]"
 
     local myip
     myip=$(hostname -I | awk '{print $1}')
     echo "my ip address = [${myip}]"
 
-    local mport
+    local master_port
     # shellcheck disable=SC2016
-    mport=$(docker exec "${master}" bash -c 'echo $MYSQL_PORT')
-    echo "master mysql port = [${mport}]"
+    master_port=$(docker exec "${master}" bash -c 'echo $MYSQL_PORT')
+    echo "master mysql port = [${master_port}]"
 
-    local sport
+    local slave_port
     # shellcheck disable=SC2016
-    sport=$(docker exec "${slave}" bash -c 'echo $MYSQL_PORT')
-    echo "slave mysql port = [${sport}]"
+    slave_port=$(docker exec "${slave}" bash -c 'echo $MYSQL_PORT')
+    echo "slave mysql port = [${slave_port}]"
 
     # Stop replication on slave; reset slave.
-    mysql -h "${myip}" -P "${sport}" -u root -p"${spass}" -e "stop slave; reset slave all; reset master;"
+    mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}" -e "stop slave; reset slave all; reset master;"
 
     # Dump all data from master to slave.
-    mysqldump -h "${myip}" -P "${mport}" -u root -p"${mpass}" --all-databases --events --triggers --routines --single-transaction --set-gtid-purged=on | mysql -h "${myip}" -P "${sport}" -u root -p"${spass}"
+    mysqldump -h "${myip}" -P "${master_port}" -u root -p"${master_password}" --all-databases --events --triggers --routines --single-transaction --set-gtid-purged=on | mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error dumping data from [${master}] to [${slave}]"
@@ -82,16 +84,17 @@ make_docker_gtid_slave() {
     fi
 
     # Setup replication.
-    mysql -h "${myip}" -P "${sport}" -u root -p"${mpass}" -e "change master to master_host='${myip}', master_port=${mport}, master_user='${ruser}', master_password='${rpass}', master_auto_position=1; start slave;"
+    echo "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1, get_master_public_key=1; start slave;"
+    mysql -h "${myip}" -P "${slave_port}" -u root -p"${master_password}" -e "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1, get_master_public_key=1; start slave;"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error setting up replication on [${slave}]"
         exit 1
     fi
 
-    local sthreads
-    sthreads=$(mysql -h "${myip}" -P "${sport}" -u root -p"${mpass}" -e "show slave status\G" | grep -c "Slave_IO_Running: Yes\|Slave_SQL_Running: Yes")
-    if [ "${sthreads}" -ne 2 ]; then
+    local slave_threads
+    slave_threads=$(mysql -h "${myip}" -P "${slave_port}" -u root -p"${master_password}" -e "show slave status\G" | grep -c "Slave_IO_Running: Yes\|Slave_SQL_Running: Yes")
+    if [ "${slave_threads}" -ne 2 ]; then
         echo "Error: replication thread(s) not running."
         exit 1
     fi
