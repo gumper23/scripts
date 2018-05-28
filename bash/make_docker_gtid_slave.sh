@@ -61,11 +61,13 @@ make_docker_gtid_slave() {
     echo "my ip address = [${myip}]"
 
     local mport
-    mport=$(docker inspect "${master}" -f '{{(index (index .HostConfig.PortBindings "3306/tcp") 0).HostPort}}')
+    # shellcheck disable=SC2016
+    mport=$(docker exec "${master}" bash -c 'echo $MYSQL_PORT')
     echo "master mysql port = [${mport}]"
 
     local sport
-    sport=$(docker inspect "${slave}" -f '{{(index (index .HostConfig.PortBindings "3306/tcp") 0).HostPort}}')
+    # shellcheck disable=SC2016
+    sport=$(docker exec "${slave}" bash -c 'echo $MYSQL_PORT')
     echo "slave mysql port = [${sport}]"
 
     # Stop replication on slave; reset slave.
