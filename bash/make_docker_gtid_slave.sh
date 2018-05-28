@@ -87,6 +87,13 @@ make_docker_gtid_slave() {
         exit 1
     fi
 
+    local sthreads
+    sthreads=$(mysql -h "${myip}" -P "${sport}" -u root -p"${mpass}" -e "show slave status\G" | grep -c "Slave_IO_Running: Yes\|Slave_SQL_Running: Yes")
+    if [ "${sthreads}" -ne 2 ]; then
+        echo "Error: replication thread(s) not running."
+        exit 1
+    fi
+
     echo "[${slave}] is now replicating from [${master}]"
 }
 
