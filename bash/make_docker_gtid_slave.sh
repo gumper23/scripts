@@ -8,6 +8,12 @@ make_docker_gtid_slave() {
         echo "Usage: make_docker_gtid_slave master_container_name slave_container_name"
         exit 1
     fi
+
+    if [ "${master}" = "${slave}" ]; then
+        echo "[${master}] is the same container as [${slave}]. Exiting."
+        exit 1
+    fi
+
     echo "Making [${slave}] a slave of [${master}]"
 
     local mpass
