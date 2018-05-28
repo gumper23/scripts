@@ -35,7 +35,7 @@ make_docker_gtid_slave() {
     echo "slave password = [${spass}]"
 
     local myip
-    myip=$(ip -4 address | grep inet | grep "10\.*" | awk '{print $2}' | sed 's/\/.*//g')
+    myip=$(hostname -I | awk '{print $1}')
     echo "my ip address = [${myip}]"
 
     local mport
