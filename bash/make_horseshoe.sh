@@ -21,6 +21,9 @@ log_slave_updates
 gtid_mode = ON
 enforce_gtid_consistency = true
 log_timestamps = system
+report_host = ${container}
+report_port = ${port}
+default_authentication_plugin = mysql_native_password
 EOF"
 
     # Make slaves read-only.
@@ -33,7 +36,7 @@ EOF"
 
     can_connect=0
     for i in {1..60}; do
-        echo "Attempt [${i}]"
+        echo "Connection attempt [${i}]"
         mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" --connect-timeout=1 -e "select 1" 1> /dev/null 2>&1;
         # shellcheck disable=SC2181
         if [ $? -eq 0 ]; then
@@ -43,26 +46,37 @@ EOF"
         sleep 1;
     done
 
-    if [ ${can_connect} -eq 0 ]; then
+    if [ "${can_connect}" -eq 0 ]; then
         echo "Failed to create ${container}."
         exit 1
     fi
 
-    # On the master, setup replication user.
+    # On the master, setup users.
     if [ "${instance}" -eq 1 ]; then
+
+		# User replica.
         mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" -e "create user if not exists 'replica'@'%' identified with mysql_native_password by 'replica' password expire never; grant replication slave on *.* to 'replica'@'%'; flush privileges;" 
         # shellcheck disable=SC2181
         if [ $? -ne 0 ]; then
             echo "$0: Error creating replication user."
             exit 1
         fi
+
+        # User rsmith.
+        mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" -e "create user if not exists 'rsmith'@'%' identified with mysql_native_password by '${MYSQL_PASSWORD}' password expire never; grant all privileges on *.* to 'rsmith'@'%' with grant option; flush privileges;"
+        # shellcheck disable=SC2181
+        if [ $? -ne 0 ]; then
+            echo "$0: Error creating rsmith user."
+            exit 1
+        fi
+
     else
         # Instance 1 is the master of instances 2 and 3.
         # Instance 2 is the master of instance 4.
         master_instance=1
-        if [ "${instance}" -eq 4 ]; then
-            master_instance=2
-        fi
+        #if [ "${instance}" -eq 4 ]; then
+        #    master_instance=2
+        #fi
         master_container="mysql${master_instance}"
 
         ./make_docker_gtid_slave.sh "${master_container}" "${container}"
@@ -77,9 +91,6 @@ done
 
 # Setup master-master between 1 and 2.
 mysql -h "${myip}" -P 13306 -u root -p"${MYSQL_PASSWORD}" -e "stop slave; reset slave all; change master to master_host='${myip}', master_port=23306, master_user='replica', master_password='replica', master_auto_position=1; start slave;"
-
-# Create the rsmith user on the master.
-mysql -h "${myip}" -P 13306 -u root -p"${MYSQL_PASSWORD}" -e "create user if not exists 'rsmith'@'%' identified with mysql_native_password by '${MYSQL_PASSWORD}' password expire never; grant all privileges on *.* to 'rsmith'@'%' with grant option; flush privileges;"
 
 # Create the rsmith database.
 mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists rsmith"

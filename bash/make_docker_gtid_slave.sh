@@ -84,8 +84,8 @@ make_docker_gtid_slave() {
     fi
 
     # Setup replication.
-    echo "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1, get_master_public_key=1; start slave;"
-    mysql -h "${myip}" -P "${slave_port}" -u root -p"${master_password}" -e "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1, get_master_public_key=1; start slave;"
+    echo "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1; start slave;"
+    mysql -h "${myip}" -P "${slave_port}" -u root -p"${master_password}" -e "change master to master_host='${myip}', master_port=${master_port}, master_user='${replica_user}', master_password='${replica_password}', master_auto_position=1; start slave;"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error setting up replication on [${slave}]"
