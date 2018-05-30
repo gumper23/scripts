@@ -76,7 +76,8 @@ make_docker_gtid_slave() {
     mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}" -e "stop slave; reset slave all; reset master;"
 
     # Dump all data from master to slave.
-    mysqldump -h "${myip}" -P "${master_port}" -u root -p"${master_password}" --all-databases --events --triggers --routines --single-transaction --set-gtid-purged=on | mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}"
+    mysqldump -h "${myip}" -P "${master_port}" -u root -p"${master_password}" --all-databases --events --triggers --routines --single-transaction --flush-privileges --set-gtid-purged=auto | mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}"
+    mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}" -e "flush privileges"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error dumping data from [${master}] to [${slave}]"

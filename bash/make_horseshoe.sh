@@ -74,9 +74,9 @@ EOF"
         # Instance 1 is the master of instances 2 and 3.
         # Instance 2 is the master of instance 4.
         master_instance=1
-        #if [ "${instance}" -eq 4 ]; then
-        #    master_instance=2
-        #fi
+        if [ "${instance}" -eq 4 ]; then
+            master_instance=2
+        fi
         master_container="mysql${master_instance}"
 
         ./make_docker_gtid_slave.sh "${master_container}" "${container}"
@@ -94,5 +94,8 @@ mysql -h "${myip}" -P 13306 -u root -p"${MYSQL_PASSWORD}" -e "stop slave; reset 
 
 # Create the rsmith database.
 mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists rsmith"
+
+# Create the steam database.
+mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists steam"
 
 
