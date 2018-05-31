@@ -32,7 +32,7 @@ EOF"
     fi
 
     # Start the container.
-    docker run --name "${container}" -p "${port}":"${port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
+    docker run --name "${container}" -p "${port}":"${port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:5.7
 
     can_connect=0
     for i in {1..60}; do
@@ -54,7 +54,7 @@ EOF"
     # On the master, setup users.
     if [ "${instance}" -eq 1 ]; then
 
-		# User replica.
+        # User replica.
         mysql -h "${myip}" -P "${port}" -u root -p"${MYSQL_PASSWORD}" -e "create user if not exists 'replica'@'%' identified with mysql_native_password by 'replica' password expire never; grant replication slave on *.* to 'replica'@'%'; flush privileges;" 
         # shellcheck disable=SC2181
         if [ $? -ne 0 ]; then
