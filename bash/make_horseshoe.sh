@@ -26,13 +26,13 @@ report_port = ${port}
 default_authentication_plugin = mysql_native_password
 EOF"
 
-    # Make slaves read-only.
+    # Make slaves read-only by default.
     if [ "${instance}" -ne 1 ]; then
         sudo bash -c "echo \"read_only = 1\" >> ${rootdir}/${container}/conf.d/my.cnf"
     fi
 
     # Start the container.
-    docker run --name "${container}" -p "${port}":"${port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:5.7
+    docker run --name "${container}" -p "${port}":"${port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
 
     can_connect=0
     for i in {1..60}; do
@@ -70,12 +70,28 @@ EOF"
             exit 1
         fi
 
+        # Create the rsmith database.
+        mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists rsmith"
+        # shellcheck disable=SC2181
+        if [ $? -ne 0 ]; then
+            echo "$0: Error creating rsmith database."
+            exit 1
+        fi
+
+        # Create the steam database.
+        mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists steam"
+        # shellcheck disable=SC2181
+        if [ $? -ne 0 ]; then
+            echo "$0: Error creating steam database."
+            exit 1
+        fi
+
     else
         # Instance 1 is the master of instances 2 and 3.
         # Instance 2 is the master of instance 4.
         master_instance=1
         if [ "${instance}" -eq 4 ]; then
-            master_instance=2
+            master_instance=3
         fi
         master_container="mysql${master_instance}"
 
@@ -89,13 +105,10 @@ EOF"
 
 done
 
-# Setup master-master between 1 and 2.
-mysql -h "${myip}" -P 13306 -u root -p"${MYSQL_PASSWORD}" -e "stop slave; reset slave all; change master to master_host='${myip}', master_port=23306, master_user='replica', master_password='replica', master_auto_position=1; start slave;"
-
-# Create the rsmith database.
-mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists rsmith"
-
-# Create the steam database.
-mysql -h "${myip}" -P13306 -u rsmith -p"${MYSQL_PASSWORD}" -e "create database if not exists steam"
-
-
+# Setup master-master between 1 and 3.
+mysql -h "${myip}" -P 13306 -u root -p"${MYSQL_PASSWORD}" -e "stop slave; reset slave all; change master to master_host='${myip}', master_port=33306, master_user='replica', master_password='replica', master_auto_position=1; start slave;"
+# shellcheck disable=SC2181
+if [ $? -ne 0 ]; then
+    echo "$0: Error setting up replication between 13306 and 33306."
+    exit 1
+fi
