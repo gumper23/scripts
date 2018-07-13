@@ -24,6 +24,8 @@ log_timestamps = system
 report_host = ${container}
 report_port = ${port}
 default_authentication_plugin = mysql_native_password
+secure_file_priv = ''
+log_bin_trust_function_creators = 1
 EOF"
 
     # Make slaves read-only by default.
