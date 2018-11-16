@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 make_docker_gtid_slave() {
     local master=${1}

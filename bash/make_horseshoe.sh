@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 myip=$(hostname -I | awk '{print $1}')
 for port in 13306 23306 33306 43306; do
