@@ -5,6 +5,7 @@ for port in 13306 23306 33306 43306; do
     rootdir="/data/docker"
     instance="${port:0:1}"
     container="mysql${instance}"
+    mysqlx_port=$((port+1))
 
     # Make the directories.
     sudo mkdir -p "${rootdir}"/"${container}"/conf.d "${rootdir}"/"${container}"/data "${rootdir}"/"${container}"/run
@@ -15,6 +16,7 @@ for port in 13306 23306 33306 43306; do
 [mysqld]
 server-id = ${instance}
 port = ${port}
+mysqlx_port = ${mysqlx_port}
 binlog_format = ROW
 log_bin
 log_slave_updates
@@ -34,7 +36,7 @@ EOF"
     fi
 
     # Start the container.
-    docker run --name "${container}" -p "${port}":"${port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
+    docker run --name "${container}" -p "${port}":"${port}" -p "${mysqlx_port}":"${mysqlx_port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
 
     can_connect=0
     for i in {1..60}; do
