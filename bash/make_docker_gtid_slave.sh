@@ -76,7 +76,7 @@ make_docker_gtid_slave() {
     mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}" -e "stop slave; reset slave all; reset master;"
 
     # Dump all data from master to slave.
-    mysqldump -h "${myip}" -P "${master_port}" -u root -p"${master_password}" --column-statistics=0 --all-databases --events --triggers --routines --single-transaction --flush-privileges --set-gtid-purged=auto | mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}"
+    mysqldump -h "${myip}" -P "${master_port}" -u root -p"${master_password}" --all-databases --events --triggers --routines --single-transaction --flush-privileges | mysql -h "${myip}" -P "${slave_port}" -u root -p"${slave_password}"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         echo "Error dumping data from [${master}] to [${slave}]"
@@ -91,11 +91,13 @@ make_docker_gtid_slave() {
         echo "Error setting up replication on [${slave}]"
         exit 1
     fi
+    sleep 1
 
     local slave_threads
     slave_threads=$(mysql -h "${myip}" -P "${slave_port}" -u root -p"${master_password}" -e "show slave status\G" | grep -c "Slave_IO_Running: Yes\|Slave_SQL_Running: Yes")
     if [ "${slave_threads}" -ne 2 ]; then
         echo "Error: replication thread(s) not running."
+        echo "slave_threads = [${slave_threads}]"
         exit 1
     fi
 

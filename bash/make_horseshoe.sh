@@ -16,7 +16,10 @@ for port in 13306 23306 33306 43306; do
 [mysqld]
 server-id = ${instance}
 port = ${port}
+socket = /var/lib/mysql/mysql.sock
 mysqlx_port = ${mysqlx_port}
+mysqlx_socket = /var/lib/mysql/mysqlx.sock
+pid_file = /var/lib/mysql/mysql.pid
 binlog_format = ROW
 log_bin
 log_slave_updates
