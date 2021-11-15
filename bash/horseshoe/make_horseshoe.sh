@@ -39,7 +39,7 @@ EOF"
     fi
 
     # Start the container.
-    docker run --name "${container}" -p "${port}":"${port}" -p "${mysqlx_port}":"${mysqlx_port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -d mysql:8
+    docker run --name "${container}" -p "${port}":"${port}" -p "${mysqlx_port}":"${mysqlx_port}" -v "${rootdir}"/"${container}"/conf.d:/etc/mysql/conf.d -v "${rootdir}"/"${container}"/data:/var/lib/mysql -v /tmp:/tmp -v "${rootdir}"/"${container}"/run:/var/run/mysqld -e MYSQL_ROOT_PASSWORD="${MYSQL_PASSWORD}" -e TZ="$(cat /etc/timezone)" -e MYSQL_REPLICATION_USER=replica -e MYSQL_REPLICATION_PASSWORD=replica -e MYSQL_PORT="${port}" -h "${container}" -d mysql:8
 
     can_connect=0
     for i in {1..60}; do
